@@ -1,4 +1,5 @@
 #portfolio optimization
+# author - Omar Khazamov
 
 import QSTK.qstkutil.qsdateutil as du
 import QSTK.qstkutil.tsutil as tsu
