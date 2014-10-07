@@ -23,12 +23,11 @@ def simulate(startdate, enddate, ls_symbols, weights):
  ldf_data = c_dataobj.get_data(ldt_timestamps, ls_symbols, ls_keys)
  d_data = dict(zip(ls_keys, ldf_data))
  SR = {}
-#na_normalized_price = na_price / na_price[0, :]
+
 
 
  
  close_prices = d_data['close'].copy()
- #open_prices = d_data['open'].values
  close_prices= close_prices.fillna(method='ffill')
  close_prices = close_prices.fillna(method='bfill') 
  na_rets = close_prices.values
@@ -40,8 +39,6 @@ def simulate(startdate, enddate, ls_symbols, weights):
  avg = np.mean(daily_portfolio_return) 
  stdev = np.std(daily_portfolio_return)
 
- #na_rets = na_rets / na_rets[0,:]
- 
     
 
  SR = avg / stdev
