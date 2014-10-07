@@ -11,11 +11,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-#  vol, daily_ret, sharpe, cum_ret = simulate(dt.date(2011,1,1), dt.date(2011,12,31),  ['AAPL', 'GLD', 'GOOG', 'XOM'], [0.4, 0.4, 0.0, 0.2])
-  
-#  ls_symbols = ["AAPL", "GLD", "GOOG", "$SPX", "XOM"]
-
-
 
 def simulate(startdate, enddate, ls_symbols, weights):
  dt_start = startdate
