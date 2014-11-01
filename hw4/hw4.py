@@ -2,9 +2,9 @@
 # - feed in results of event profiler to market simulator of hw3
 
 '''
-@author: Sourabh Bajaj, Omar Khazamov
+@author:  Omar Khazamov - sort-by-column is a copy from pycsv tutorial
 
-@summary: Event Profiler 
+@summary: Market Simulator with Bollinger bands implementation
 '''
 
 import os
@@ -19,6 +19,7 @@ from dateutil.relativedelta import *
 import operator
 import copy
 import math
+import matplotlib.pyplot as plt
 
 ls_keys = ['open', 'high', 'low', 'close', 'volume', 'actual_close']
     # function for sorting csv file from csv how-to
@@ -54,7 +55,9 @@ class Trader:
       
       filepath = ''
       
-      def __init__(self, filename, dataprovider, initial_cash):
+      def __init__(self, filename, dataprovider, startdt, enddt, initial_cash):
+          self.dt_start = startdt
+          self.dt_end = enddt 
           self.filepath = filename
           self.cumulativeportval = initial_cash
           self.order_table = []
@@ -65,19 +68,18 @@ class Trader:
           self.daily_portfolio_val = []
           self.ls_symbols = []
           
-          dt_start = dt.datetime(2008, 1, 1)
-          dt_end = dt.datetime(2009, 12, 31)
-          ldt_timestamps = du.getNYSEdays(dt_start, dt_end, dt.timedelta(hours=16))
+          self.ldt_timestamps = du.getNYSEdays(self.dt_start, self.dt_end, dt.timedelta(hours=16))
       
           self.dataobj = da.DataAccess(dataprovider)
           self.ls_symbols = self.dataobj.get_symbols_from_list('sp5002012')
           #ls_symbols_2008 = dataobj.get_symbols_from_list('sp5002008')
-          self.ls_symbols.append('SPY')
+          
+          #
           #ls_symbols_2008.append('SPY')
           
-          ldf_data = self.dataobj.get_data(ldt_timestamps, self.ls_symbols, ls_keys)
+          spy_ldf_data = self.dataobj.get_data(self.ldt_timestamps, ['SPY'], ls_keys)
           #ldf_data_2008 = dataobj.get_data(ldt_timestamps, ls_symbols_2008, ls_keys)
-          self.d_data = dict(zip(ls_keys, ldf_data))             
+          self.spy_d_data = dict(zip(ls_keys, spy_ldf_data ))            
           
       def process_data(self):
           
@@ -103,7 +105,7 @@ class Trader:
               self.ldt_timestamps = du.getNYSEdays(reader_listDT[0][0], reader_listDT[-1][0], dt.timedelta(hours=16))
               ldf_data = self.dataobj.get_data(self.ldt_timestamps, list(portfolioset), ls_keys)
               #after zipping up with ls_keys, it's basically a dictionary of dictionary
-              d_data = dict(zip(ls_keys, ldf_data))
+              self.d_data = dict(zip(ls_keys, ldf_data))
               #need order table to run simulation
               self.order_table = copy.deepcopy(reader_listDT)
               #initialize portfolio allocation
@@ -112,13 +114,58 @@ class Trader:
           except Exception, e: 
                print e 
            
-  
+      def bollinger_bands(self, stock):   
+              dt_start = self.dt_start 
+              dt_end = self.dt_end 
+              ldf_data = self.dataobj.get_data(self.ldt_timestamps, [stock], ls_keys)
+              d_data = dict(zip(ls_keys, ldf_data ))               
+              bollinger_band = []
+              moving_average = []
+              upper_band = []
+              lower_band = []
+              indicator = np.array([])
+              close_price = d_data['close'].copy()
+              close_price = close_price.fillna(method='ffill')
+              close_price = close_price.fillna(method='backfill')                
+              close_prices=close_price.values
+              
+              #for i in range(0, len(self.ldt_timestamps)):
+                
+                #price = close_prices[i]
+                #if i-20 < 0:
+                        #roll_idx = 0
+                #else:
+                        #roll_idx = i - 20
+              means = pd.stats.moments.rolling_mean(close_prices, 20, min_periods = 20)
+              stdev = pd.stats.moments.rolling_std(close_prices, 20, min_periods = 20)
+              
+              upper_band = means + stdev
+              lower_band = means - stdev
+              bollinger_band = (close_prices - means) / stdev
+              
+             
+              
+              plt.clf()
+              plt.plot(self.ldt_timestamps, close_prices, label= stock)
+              #plt.plot(self.ldt_timestamps, means, label = 'MovAVG')
+              #plt.plot(self.ldt_timestamps, upper_band, facecolor   = 'grey', label = None)
+              #plt.plot(self.ldt_timestamps, lower_band, facecolor  = 'red', label = None)
+              plt.fill_between(self.ldt_timestamps, upper_band.flatten(), lower_band.flatten(), facecolor='grey')
+              plt.legend(self.ls_symbols)
+              plt.ylabel('Close')
+              plt.xlabel('Date')           
+              
+              for key, v in zip(self.ldt_timestamps,bollinger_band):
+                      print key, v
+              
+              
+              
       def find_events(self):
                    ''' Finding the event dataframe '''
                    df_close = self.d_data['close']
                    df_actual_close = self.d_data['actual_close']    
                    ts_market = df_actual_close['SPY']
-               
+                   
                    print "Finding Events"
                    # separate out event related parameters
                    # from transcation parameters
@@ -173,7 +220,7 @@ class Trader:
           #print d_data
           close_prices = self.d_data['close'].copy()
           close_prices = close_prices.fillna(method='ffill')
-          close_prices = close_prices.fillna(method='bfill')            
+          close_prices = close_prices.fillna(method='bfill') 
           tradedates = []
           #idea is loop through every single day and then, check an order book if the date is in there
           for time in self.ldt_timestamps: 
@@ -217,20 +264,34 @@ class Trader:
                  
                  total_return = total_return * (1 + daily_portfolio_return[ret])
              
+             spy_ldf_data = self.dataobj.get_data(self.ldt_timestamps, ['SPY'], ls_keys)
+                 #ldf_data_2008 = dataobj.get_data(ldt_timestamps, ls_symbols_2008, ls_keys)
+             spy_d_data = dict(zip(ls_keys, spy_ldf_data ))               
+             close_prices = spy_d_data['close'].copy()
+             close_prices = close_prices.fillna(method='ffill')
+             close_prices = close_prices.fillna(method='bfill') 
+             na_rets_spy = close_prices['SPY'].values
+             daily_spy_return = tsu.returnize0(na_rets_spy)
              
              print "AVG return: ",avg, "stdev of return: ", stdev, "sharp ratio: ", SR , "total cumulative return", total_return      
-          
+             plt.clf()
+             plt.plot(self.ldt_timestamps, daily_portfolio_return)
+             plt.plot(self.ldt_timestamps, daily_spy_return)
+             plt.legend(self.ls_symbols)
+             plt.ylabel('Return comparison')
+             plt.xlabel('Date')             
                 
 def main():
      
 
-        rstrategy = Trader('D:\\orders.csv', 'Yahoo', 50000)
-        rstrategy.process_data()        
-        rstrategy.find_events()
+        rstrategy = Trader('D:\\orders.csv', 'Yahoo', dt.datetime(2010, 1, 1), dt.datetime(2010, 12, 31), 50000)
+        #rstrategy.process_data()        
+        rstrategy.bollinger_bands('MSFT')
+        #rstrategy.find_events()
         
-        rstrategy.run()
-        rstrategy.computestats()
+        #rstrategy.run()
+        #rstrategy.computestats()
         
-        print rstrategy.order_table
+        #print rstrategy.order_table
 if __name__ == '__main__':
         main()
